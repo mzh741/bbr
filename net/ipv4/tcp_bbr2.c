@@ -272,7 +272,7 @@ static uint bbr_cwnd_tso_budget = 1;
  * lower than the estimated bandwidth. This is an important aspect of the
  * design.
  */
-static const int bbr_pacing_margin_percent = 1;
+static const int bbr_pacing_margin_percent = 100;/*超过bw的一倍*/
 
 /* We use a high_gain value of 2/ln(2) because it's the smallest pacing gain
  * that will allow a smoothly increasing pacing rate that will double each RTT
@@ -342,7 +342,7 @@ static bool bbr_debug_with_printk;
 static bool bbr_debug_ftrace;
 
 /* Experiment: each cycle, try to hold sub-unity gain until inflight <= BDP. */
-static bool bbr_drain_to_target = true;		/* default: enabled */
+static bool bbr_drain_to_target = false;		/* default: enabled */
 
 /* Experiment: Flags to control BBR with ECN behavior.
  */
@@ -438,7 +438,7 @@ static bool bbr_full_bw_reached(const struct sock *sk)
 {
 	const struct bbr *bbr = inet_csk_ca(sk);
 
-	return bbr->full_bw_reached;
+	return false;
 }
 
 /* Return the windowed max recent bandwidth sample, in pkts/uS << BW_SCALE. */
@@ -479,7 +479,7 @@ static u64 bbr_rate_bytes_per_sec(struct sock *sk, u64 rate, int gain,
 	rate *= mss;
 	rate *= gain;
 	rate >>= BBR_SCALE;
-	rate *= USEC_PER_SEC / 100 * (100 - margin);
+	rate *= USEC_PER_SEC / 100 * (100 + margin);
 	rate >>= BW_SCALE;
 	rate = max(rate, 1ULL);
 	return rate;
@@ -487,7 +487,7 @@ static u64 bbr_rate_bytes_per_sec(struct sock *sk, u64 rate, int gain,
 
 static u64 bbr_bw_bytes_per_sec(struct sock *sk, u64 rate)
 {
-	return bbr_rate_bytes_per_sec(sk, rate, BBR_UNIT, 0);
+	return bbr_rate_bytes_per_sec(sk, rate, BBR_UNIT, 100);
 }
 
 static u64 bbr_rate_kbps(struct sock *sk, u64 rate)
