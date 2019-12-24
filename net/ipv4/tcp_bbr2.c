@@ -1108,7 +1108,7 @@ static bool bbr_check_drain(struct sock *sk, const struct rate_sample *rs,
 	    bbr_packets_in_net_at_edt(sk, tcp_packets_in_flight(tcp_sk(sk))) <=
 	    bbr_inflight(sk, bbr_max_bw(sk), BBR_UNIT))
 		return true;  /* exiting DRAIN now */
-	return false;
+	return true;
 }
 
 static void bbr_check_probe_rtt_done(struct sock *sk)
@@ -1212,7 +1212,7 @@ static void bbr_update_gains(struct sock *sk)
 		bbr->cwnd_gain	 = bbr->params.startup_cwnd_gain;
 		break;
 	case BBR_DRAIN:
-		bbr->pacing_gain = bbr->params.drain_gain;  /* slow, to drain */
+		bbr->pacing_gain =  BBR_UNIT;//bbr->params.drain_gain;  /* slow, to drain */
 		bbr->cwnd_gain = bbr->params.startup_cwnd_gain;  /* keep cwnd */
 		break;
 	case BBR_PROBE_BW:
@@ -1336,8 +1336,10 @@ static void bbr2_advance_bw_hi_filter(struct sock *sk)
 
 	if (!bbr->bw_hi[1])
 		return;  /* no samples in this window; remember old window */
-	bbr->bw_hi[0] = bbr->bw_hi[1];
-	bbr->bw_hi[1] = 0;
+	if (bbr->bw_hi[0] <= bbr->bw_hi[1]) {
+		bbr->bw_hi[0] = bbr->bw_hi[1];
+		bbr->bw_hi[1] = 0;
+	}
 }
 
 /* How much do we want in flight? Our BDP, unless congestion cut cwnd. */
@@ -1345,7 +1347,7 @@ static u32 bbr2_target_inflight(struct sock *sk)
 {
 	u32 bdp = bbr_inflight(sk, bbr_bw(sk), BBR_UNIT);
 
-	return min(bdp, tcp_sk(sk)->snd_cwnd);
+	return max(bdp, tcp_sk(sk)->snd_cwnd);
 }
 
 static bool bbr2_is_probing_bandwidth(struct sock *sk)
@@ -1385,7 +1387,7 @@ static void bbr2_check_ecn_too_high_in_startup(struct sock *sk, u32 ce_ratio)
 	    !bbr->params.full_ecn_cnt || !bbr->params.ecn_thresh)
 		return;
 
-	if (ce_ratio >= bbr->params.ecn_thresh)
+	if (ce_ratio >= bbr->params.ecn_thresh * 2)
 		bbr->startup_ecn_rounds++;
 	else
 		bbr->startup_ecn_rounds = 0;
@@ -1494,13 +1496,13 @@ static bool bbr2_is_inflight_too_high(const struct sock *sk,
 			return true;
 	}
 
-	if (rs->delivered_ce > 0 && rs->delivered > 0 &&
+	/*if (rs->delivered_ce > 0 && rs->delivered > 0 &&
 	    bbr->ecn_eligible && bbr->params.ecn_thresh) {
 		ecn_thresh = (u64)rs->delivered * bbr->params.ecn_thresh >>
 				BBR_SCALE;
 		if (rs->delivered_ce >= ecn_thresh)
 			return true;
-	}
+	}*/
 
 	return false;
 }
@@ -1570,6 +1572,7 @@ static u32 bbr2_inflight_with_headroom(const struct sock *sk)
 	headroom_fraction = bbr->params.inflight_headroom;
 	headroom = ((u64)bbr->inflight_hi * headroom_fraction) >> BBR_SCALE;
 	headroom = max(headroom, 1U);
+	headroom = min(headroom, 10U);
 	return max_t(s32, bbr->inflight_hi - headroom,
 		     bbr->params.cwnd_min_target);
 }
@@ -1604,7 +1607,10 @@ static void bbr2_bound_cwnd_for_inflight_model(struct sock *sk)
 	cap = min(cap, bbr->inflight_lo);
 
 	cap = max_t(u32, cap, bbr->params.cwnd_min_target);
-	tp->snd_cwnd = min(cap, tp->snd_cwnd);
+	if (cap <= tp->snd_cwnd) {
+		tp->snd_cwnd = (cap + tp->snd_cwnd) / 2;
+	}
+	tp->snd_cwnd = max(cap, tp->snd_cwnd);
 }
 
 /* Estimate a short-term lower bound on the capacity available now, based
