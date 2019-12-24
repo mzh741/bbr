@@ -20,7 +20,7 @@ Linux kernel) and BSD. You may use it under either license.
 ## Viewing the TCP BBR v2 alpha sources
 
 You can view the current sources here:
-[tcp_bbr2.c](https://github.com/google/bbr/blob/v2alpha/net/ipv4/tcp_bbr2.c)
+[tcp_bbr2.c](https://github.com/mzh741/bbr/blob/v2alpha/net/ipv4/tcp_bbr2.c)
 
 ## Obtaining kernel sources with TCP BBR v2 alpha
 
@@ -30,14 +30,14 @@ There are two main options for downloading the code:
 you can run:
 
 ```
-git clone -o google-bbr -b v2alpha  https://github.com/google/bbr.git
+git clone -o google-bbr -b v2alpha  https://github.com/mzh741/bbr.git
 cd bbr/
 ```
 
 2. To download the code into an existing git repo, you can use:
 
 ```
-git remote add google-bbr https://github.com/google/bbr.git
+git remote add google-bbr https://github.com/mzh741/bbr.git
 git fetch google-bbr
 git checkout google-bbr/v2alpha
 ```
